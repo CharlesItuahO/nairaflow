@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NairaFlow — Zero-Based Budgeting & Monthly Cash Flow Planner</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js for Cash Flow & Insights -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            forest: {
+              950: '#022C22',
+              900: '#064E3B',
+              800: '#065F46',
+              700: '#047857',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background-color: #F8FAFC;
+      color: #0F172A;
+    }
+    .font-tabular {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Custom scrollbar for clean fintech table feel */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+    /* Hide number input arrows */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
+
+  <!-- Toast Notification Container (Replaces alert/confirm) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="bg-forest-900 text-white border-b border-emerald-800/70 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-wrap items-center justify-between py-3.5 gap-3">
+        <!-- Brand Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-forest-950 font-extrabold text-xl shadow-inner">
+            ₦
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white">NairaFlow</h1>
+              <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                Zero-Based
+              </span>
+            </div>
+            <p class="text-xs text-emerald-200/80 hidden sm:block">Every Naira Given a Job • Monthly Cash Flow</p>
+          </div>
+        </div>
+
+        <!-- Center Navigation Tabs (Desktop) -->
+        <nav class="hidden md:flex items-center bg-forest-950/60 p-1 rounded-xl border border-emerald-800/60" aria-label="Main Tabs">
+          <button onclick="switchTab('envelopes')" id="nav-envelopes" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-emerald-500 text-forest-950 shadow-sm">
+            <i data-lucide="wallet" class="w-4 h-4"></i>
+            <span>Budget Envelopes</span>
+          </button>
+          <button onclick="switchTab('transactions')" id="nav-transactions" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all text-emerald-100 hover:text-white hover:bg-white/5">
+            <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+            <span>Transactions</span>
+            <span id="tx-count-badge" class="ml-1 px-1.5 py-0.2 text-[11px] font-tabular rounded-full bg-emerald-800 text-emerald-200">0</span>
+          </button>
+          <button onclick="switchTab('insights')" id="nav-insights" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all text-emerald-100 hover:text-white hover:bg-white/5">
+            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+            <span>Cash Flow & Insights</span>
+          </button>
+        </nav>
+
+        <!-- Right Controls: Month Selector & Quick Actions -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <div class="relative flex items-center bg-forest-950/70 border border-emerald-700/70 rounded-xl px-2.5 py-1.5">
+            <i data-lucide="calendar" class="w-4 h-4 text-emerald-400 mr-1.5 shrink-0"></i>
+            <select id="month-selector" onchange="changeMonth(this.value)" class="bg-transparent text-xs sm:text-sm font-semibold text-white focus:outline-none cursor-pointer pr-1">
+              <option value="2026-10" class="bg-slate-900 text-white">October 2026</option>
+              <option value="2026-11" selected class="bg-slate-900 text-white">November 2026</option>
+              <option value="2026-12" class="bg-slate-900 text-white">December 2026 (Detty Dec)</option>
+              <option value="2027-01" class="bg-slate-900 text-white">January 2027</option>
+            </select>
+          </div>
+
+          <button onclick="openTransactionModal()" class="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-forest-950 font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl transition shadow-sm cursor-pointer">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Log Expense</span>
+            <span class="sm:hidden">Log</span>
+          </button>
+
+          <button onclick="openResetConfirmModal()" title="Reset to Realistic Nigerian Demo Data" class="p-2 rounded-xl bg-forest-950/70 hover:bg-forest-800 border border-emerald-700/70 text-emerald-200 hover:text-white transition cursor-pointer">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Tab Bar -->
+      <div class="flex md:hidden items-center justify-between gap-1 pb-3 overflow-x-auto">
+        <button onclick="switchTab('envelopes')" id="mob-nav-envelopes" class="mob-tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500 text-forest-950">
+          <i data-lucide="wallet" class="w-3.5 h-3.5"></i>
+          <span>Envelopes</span>
+        </button>
+        <button onclick="switchTab('transactions')" id="mob-nav-transactions" class="mob-tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-100 bg-forest-950/50">
+          <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
+          <span>Transactions</span>
+        </button>
+        <button onclick="switchTab('insights')" id="mob-nav-insights" class="mob-tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-100 bg-forest-950/50">
+          <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i>
+          <span>Insights</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Zero-Based Budgeting Command Center (Top KPI Bar) -->
+    <section aria-label="Zero-Based Command Center" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+      
+      <!-- Hero KPI: Left to Assign (Zero-Based Core Metric) -->
+      <div id="left-to-assign-card" class="lg:col-span-5 rounded-2xl p-5 border transition-all shadow-sm flex flex-col justify-between bg-white border-slate-200">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <i data-lucide="target" class="w-3.5 h-3.5 text-emerald-600"></i>
+              Left to Assign (Zero-Based Target)
+            </span>
+            <div id="kpi-left-to-assign" class="font-tabular text-2xl sm:text-3xl font-extrabold mt-1.5 tracking-tight text-slate-900">
+              ₦0.00
+            </div>
+          </div>
+          <div id="zero-based-status-badge" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <p id="zero-based-helper-text" class="text-xs text-slate-600">
+            Allocate every Naira until Left to Assign reaches ₦0.00.
+          </p>
+          <div id="zero-based-action-area" class="flex items-center gap-2">
+            <!-- Dynamic quick action button (e.g., Auto-Assign Remaining or Fix Over-Assignment) -->
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2: Total Monthly Income (Interactive) -->
+      <div class="lg:col-span-3 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm flex flex-col justify-between hover:border-emerald-300 transition">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Monthly Income</span>
+            <div id="kpi-total-income" class="font-tabular text-xl sm:text-2xl font-bold text-slate-900 mt-1.5">
+              ₦0.00
+            </div>
+          </div>
+          <button onclick="openIncomeModal()" class="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer" title="Manage Income Sources">
+            <i data-lucide="pencil-line" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+          <span id="income-sources-count" class="text-slate-500 font-medium">0 income streams</span>
+          <button onclick="openIncomeModal()" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 cursor-pointer">
+            <span>Edit Sources</span>
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI 3: Total Assigned vs Spent -->
+      <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm flex flex-col justify-between">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Assigned</span>
+            <div id="kpi-total-assigned" class="font-tabular text-lg sm:text-xl font-bold text-slate-900 mt-1">
+              ₦0.00
+            </div>
+            <span id="kpi-assigned-pct" class="text-[11px] font-semibold text-emerald-600">0% of income</span>
+          </div>
+          <div class="border-l border-slate-100 pl-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Spent</span>
+            <div id="kpi-total-spent" class="font-tabular text-lg sm:text-xl font-bold text-slate-900 mt-1">
+              ₦0.00
+            </div>
+            <span id="kpi-total-available" class="text-[11px] font-semibold text-slate-500">₦0.00 left in envelopes</span>
+          </div>
+        </div>
+        <!-- Overall Budget Utilization Progress Bar -->
+        <div class="mt-4 pt-3 border-t border-slate-100">
+          <div class="flex justify-between text-[11px] font-semibold text-slate-500 mb-1.5">
+            <span>Cash Outflow Progress</span>
+            <span id="kpi-spent-pct" class="font-tabular">0%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div id="kpi-spent-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 1: BUDGET ENVELOPES VIEW -->
+    <section id="view-envelopes" class="space-y-5">
+      <!-- Action Toolbar -->
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="openEnvelopeModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-forest-900 hover:bg-forest-800 text-white text-xs sm:text-sm font-semibold transition shadow-sm cursor-pointer">
+            <i data-lucide="folder-plus" class="w-4 h-4 text-emerald-400"></i>
+            <span>New Envelope</span>
+          </button>
+          <button onclick="openCategoryModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-semibold transition cursor-pointer">
+            <i data-lucide="layers" class="w-4 h-4 text-slate-600"></i>
+            <span>New Category Group</span>
+          </button>
+          <button onclick="openMoveMoneyModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs sm:text-sm font-semibold transition cursor-pointer">
+            <i data-lucide="repeat" class="w-4 h-4 text-emerald-600"></i>
+            <span>Move Money</span>
+          </button>
+        </div>
+
+        <!-- Filter & Collapse Controls -->
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+          <div class="relative flex-1 sm:w-56">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="envelope-search" oninput="renderEnvelopes()" placeholder="Filter envelopes..." class="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+          </div>
+          <button onclick="toggleAllCategories()" id="toggle-all-btn" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer shrink-0">
+            Collapse All
+          </button>
+        </div>
+      </div>
+
+      <!-- Envelopes Table Header (Desktop) -->
+      <div class="hidden md:grid md:grid-cols-12 gap-4 px-6 py-2.5 bg-slate-200/70 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-600">
+        <div class="col-span-5">Envelope / Sinking Fund</div>
+        <div class="col-span-3 text-right pr-2">Assigned (₦)</div>
+        <div class="col-span-2 text-right">Activity / Spent</div>
+        <div class="col-span-2 text-right">Available</div>
+      </div>
+
+      <!-- Category Groups & Envelope Rows Container -->
+      <div id="categories-container" class="space-y-4">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- TAB 2: TRANSACTIONS LEDGER VIEW -->
+    <section id="view-transactions" class="hidden space-y-5">
+      <!-- Quick Inline Transaction Logger Card -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="zap" class="w-4 h-4 text-emerald-600"></i>
+            Quick Cash Flow Entry
+          </h2>
+          <span class="text-xs text-slate-500">Updates envelope balances automatically</span>
+        </div>
+        <form id="quick-tx-form" onsubmit="handleQuickTransactionSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+          <div class="lg:col-span-2">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Date</label>
+            <input type="date" id="qtx-date" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+          </div>
+          <div class="lg:col-span-3">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Payee / Description</label>
+            <input type="text" id="qtx-payee" required placeholder="e.g., Shoprite Ikeja, Bolt, PHCN..." class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+          </div>
+          <div class="lg:col-span-3">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Envelope</label>
+            <select id="qtx-envelope" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="lg:col-span-2">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Type</label>
+            <select id="qtx-type" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+              <option value="outflow">Outflow (-₦)</option>
+              <option value="inflow">Refund / Inflow (+₦)</option>
+            </select>
+          </div>
+          <div class="lg:col-span-2 flex flex-col justify-end">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Amount (₦)</label>
+            <div class="flex gap-2">
+              <input type="number" id="qtx-amount" step="0.01" min="1" required placeholder="15000" class="w-full font-tabular px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+              <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition shrink-0 cursor-pointer">
+                Add
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Search & Filter Bar for Transactions -->
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2 flex-1">
+            <div class="relative w-full sm:w-64">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="tx-search" oninput="renderTransactions()" placeholder="Search payee or note..." class="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+            </div>
+            <select id="tx-filter-envelope" onchange="renderTransactions()" class="px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+              <option value="all">All Envelopes</option>
+              <!-- Populated dynamically -->
+            </select>
+            <select id="tx-filter-type" onchange="renderTransactions()" class="px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+              <option value="all">All Types</option>
+              <option value="outflow">Outflows Only</option>
+              <option value="inflow">Inflows / Refunds Only</option>
+            </select>
+          </div>
+          <div class="text-xs font-semibold text-slate-500" id="tx-filtered-summary">
+            Showing 0 transactions
+          </div>
+        </div>
+
+        <!-- Transactions Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <th class="py-3 px-4">Date</th>
+                <th class="py-3 px-4">Payee / Description</th>
+                <th class="py-3 px-4">Envelope</th>
+                <th class="py-3 px-4 text-right">Amount (₦)</th>
+                <th class="py-3 px-4 text-center w-16">Action</th>
+              </tr>
+            </thead>
+            <tbody id="transactions-tbody" class="divide-y divide-slate-100 text-sm">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: CASH FLOW & INSIGHTS VIEW -->
+    <section id="view-insights" class="hidden space-y-6">
+      <!-- 50/30/20 Rule Breakdown Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Essential Needs & Bills</span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Target: ~50%</span>
+          </div>
+          <div id="insight-needs-amt" class="font-tabular text-2xl font-extrabold text-slate-900 mt-2">₦0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs">
+            <span id="insight-needs-pct" class="font-bold text-emerald-700">0% of Assigned</span>
+            <span class="text-slate-500">Housing, Power, Groceries, Transport</span>
+          </div>
+          <div class="w-full h-2 bg-slate-100 rounded-full mt-3 overflow-hidden">
+            <div id="insight-needs-bar" class="h-full bg-emerald-600 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Lifestyle & True Expenses</span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Target: ~30%</span>
+          </div>
+          <div id="insight-wants-amt" class="font-tabular text-2xl font-extrabold text-slate-900 mt-2">₦0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs">
+            <span id="insight-wants-pct" class="font-bold text-amber-700">0% of Assigned</span>
+            <span class="text-slate-500">Dining, Black Tax, Detty Dec, Care</span>
+          </div>
+          <div class="w-full h-2 bg-slate-100 rounded-full mt-3 overflow-hidden">
+            <div id="insight-wants-bar" class="h-full bg-amber-500 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Savings & Wealth Building</span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800">Target: ≥20%</span>
+          </div>
+          <div id="insight-savings-amt" class="font-tabular text-2xl font-extrabold text-slate-900 mt-2">₦0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs">
+            <span id="insight-savings-pct" class="font-bold text-teal-700">0% of Assigned</span>
+            <span class="text-slate-500">Emergency HYSA, USD / Mutual Funds</span>
+          </div>
+          <div class="w-full h-2 bg-slate-100 rounded-full mt-3 overflow-hidden">
+            <div id="insight-savings-bar" class="h-full bg-teal-600 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Category Allocation Donut Chart -->
+        <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
+          <h3 class="text-base font-bold text-slate-900">Allocation by Category Group</h3>
+          <p class="text-xs text-slate-500 mb-4">Share of total Naira assigned across envelope groups</p>
+          <div class="relative flex-1 min-h-[260px] flex items-center justify-center">
+            <canvas id="allocationDonutChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Assigned vs Spent Grouped Bar Chart -->
+        <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
+          <h3 class="text-base font-bold text-slate-900">Assigned vs. Actual Spent (₦)</h3>
+          <p class="text-xs text-slate-500 mb-4">Comparing budgeted targets against real cash outflows</p>
+          <div class="relative flex-1 min-h-[260px]">
+            <canvas id="assignedVsSpentChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200/80 py-4 mt-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-forest-900">NairaFlow</span>
+        <span>•</span>
+        <span>Zero-Based Envelope Budgeting Portal (₦ NGN)</span>
+      </div>
+      <div>
+        Auto-saved locally in browser storage (<code class="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">nairaflow_v1</code>)
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. Manage Monthly Income Modal -->
+  <div id="income-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-forest-900 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold">Monthly Income Streams</h3>
+          <p class="text-xs text-emerald-200">Total cash available to assign a job this month</p>
+        </div>
+        <button onclick="closeModal('income-modal')" class="p-1.5 rounded-lg hover:bg-white/10 text-emerald-100 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div id="income-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+          <!-- Populated dynamically -->
+        </div>
+
+        <form onsubmit="addIncomeSource(event)" class="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+          <input type="text" id="new-income-name" required placeholder="Source (e.g., Salary, Consulting)" class="sm:col-span-6 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+          <input type="number" id="new-income-amount" step="0.01" min="1" required placeholder="Amount (₦)" class="sm:col-span-4 font-tabular px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+          <button type="submit" class="sm:col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-2 px-3 rounded-xl transition cursor-pointer">
+            Add
+          </button>
+        </form>
+      </div>
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase text-slate-500">Total Monthly Income</span>
+        <span id="modal-total-income" class="font-tabular text-lg font-extrabold text-emerald-700">₦0.00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Log Transaction Modal -->
+  <div id="transaction-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-forest-900 text-white flex items-center justify-between">
+        <h3 class="text-base font-bold">Log Cash Flow Transaction</h3>
+        <button onclick="closeModal('transaction-modal')" class="p-1.5 rounded-lg hover:bg-white/10 text-emerald-100 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="handleModalTransactionSubmit(event)" class="p-6 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Date</label>
+            <input type="date" id="mtx-date" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Flow Type</label>
+            <select id="mtx-type" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+              <option value="outflow">Outflow / Expense (-₦)</option>
+              <option value="inflow">Inflow / Refund (+₦)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Payee / Description</label>
+          <input type="text" id="mtx-payee" required placeholder="e.g., Ikeja Electric Token, Chicken Republic" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Budget Envelope</label>
+          <select id="mtx-envelope" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Amount (₦)</label>
+          <input type="number" id="mtx-amount" step="0.01" min="1" required placeholder="0.00" class="w-full font-tabular text-lg font-bold px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('transaction-modal')" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm cursor-pointer">Save Transaction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Move Money (Reallocate Funds) Modal -->
+  <div id="move-money-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-forest-900 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold">Move Money Between Envelopes</h3>
+          <p class="text-xs text-emerald-200">Rule 3: Roll with the punches & cover overspending</p>
+        </div>
+        <button onclick="closeModal('move-money-modal')" class="p-1.5 rounded-lg hover:bg-white/10 text-emerald-100 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="handleMoveMoneySubmit(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">From Source</label>
+          <select id="move-from" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">To Destination Envelope</label>
+          <select id="move-to" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Amount to Move (₦)</label>
+          <input type="number" id="move-amount" step="0.01" min="1" required placeholder="10000" class="w-full font-tabular text-lg font-bold px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('move-money-modal')" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm cursor-pointer">Transfer Naira</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Create / Edit Envelope Modal -->
+  <div id="envelope-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-forest-900 text-white flex items-center justify-between">
+        <h3 id="env-modal-title" class="text-base font-bold">Create New Envelope</h3>
+        <button onclick="closeModal('envelope-modal')" class="p-1.5 rounded-lg hover:bg-white/10 text-emerald-100 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="handleEnvelopeSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="env-edit-id" />
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Category Group</label>
+          <select id="env-category-select" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Envelope Name</label>
+          <input type="text" id="env-name-input" required placeholder="e.g., Generator Fuel, Cowrywise Savings" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Target Note / Goal (Optional)</label>
+          <input type="text" id="env-note-input" placeholder="e.g., ₦1.2M Annual Rent by July" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Initial Assigned Amount (₦)</label>
+          <input type="number" id="env-assigned-input" step="0.01" min="0" value="0" class="w-full font-tabular px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div class="pt-2 flex justify-between items-center">
+          <button type="button" id="env-delete-btn" onclick="deleteCurrentEnvelope()" class="hidden px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer">
+            Delete Envelope
+          </button>
+          <div class="flex gap-2 ml-auto">
+            <button type="button" onclick="closeModal('envelope-modal')" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Cancel</button>
+            <button type="submit" class="px-5 py-2 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm cursor-pointer">Save Envelope</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. Create Category Group Modal -->
+  <div id="category-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-forest-900 text-white flex items-center justify-between">
+        <h3 class="text-base font-bold">New Category Group</h3>
+        <button onclick="closeModal('category-modal')" class="p-1.5 rounded-lg hover:bg-white/10 text-emerald-100 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="handleCategorySubmit(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Group Name</label>
+          <input type="text" id="cat-name-input" required placeholder="e.g., Side Business Overhead, Kids & School" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">50/30/20 Classification</label>
+          <select id="cat-tier-input" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500">
+            <option value="needs">Essential Needs & Fixed Bills (50%)</option>
+            <option value="wants">Lifestyle & True Expenses (30%)</option>
+            <option value="savings">Savings & Wealth Building (20%)</option>
+          </select>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('category-modal')" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm cursor-pointer">Create Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. Reset Demo Data Confirmation Modal (No browser confirm()) -->
+  <div id="reset-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="p-6 text-center space-y-3">
+        <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+          <i data-lucide="rotate-ccw" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900">Reset to Nigerian Demo Data?</h3>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          This will restore realistic Nigerian Naira (₦) income streams, Lagos/Abuja household envelopes, and sample transactions for the current month.
+        </p>
+        <div class="pt-3 flex gap-2 justify-center">
+          <button onclick="closeModal('reset-modal')" class="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer">Cancel</button>
+          <button onclick="confirmResetDemoData()" class="flex-1 px-4 py-2 text-sm font-bold bg-forest-900 hover:bg-forest-800 text-white rounded-xl cursor-pointer">Restore Demo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT LOGIC ==================== -->
+  <script>
+    const STORAGE_KEY = 'nairaflow_v1';
+
+    // Default realistic Nigerian Naira dataset for November 2026
+    function getDefaultDemoData() {
+      return {
+        currentMonth: '2026-11',
+        activeTab: 'envelopes',
+        allCollapsed: false,
+        months: {
+          '2026-11': {
+            incomes: [
+              { id: 'inc_1', name: 'Primary Tech / Corporate Salary', amount: 850000 },
+              { id: 'inc_2', name: 'Product Design Consulting', amount: 220000 },
+              { id: 'inc_3', name: 'Treasury Bills / MMF Dividend', amount: 80000 }
+            ],
+            categories: [
+              {
+                id: 'cat_fixed',
+                name: 'Fixed Bills & Housing',
+                tier: 'needs',
+                collapsed: false,
+                envelopes: [
+                  { id: 'env_rent', name: 'House Rent Sinking Fund', note: 'Target: ₦1.8M/yr Lekki/Yaba', assigned: 150000 },
+                  { id: 'env_power', name: 'PHCN Band A & Inverter/Fuel', note: 'Prepaid meter + PMS reserve', assigned: 95000 },
+                  { id: 'env_internet', name: 'Fibre One & MTN 5G Data', note: 'Home fibre + mobile data', assigned: 38000 },
+                  { id: 'env_estate', name: 'Estate Security & LAWMA Dues', note: 'Monthly service charge', assigned: 25000 }
+                ]
+              },
+              {
+                id: 'cat_living',
+                name: 'Everyday Living',
+                tier: 'needs',
+                collapsed: false,
+                envelopes: [
+                  { id: 'env_groceries', name: 'Groceries & Mile 12 / Supermarket', note: 'Weekly foodstuff & staples', assigned: 165000 },
+                  { id: 'env_transport', name: 'Fuel & Bolt / Uber Rides', note: 'Daily commute & weekend trips', assigned: 90000 },
+                  { id: 'env_dining', name: 'Dining Out & Suya Nights', note: 'Restaurants, shawarma & hangouts', assigned: 55000 },
+                  { id: 'env_health', name: 'Personal Care & Pharmacy', note: 'Skincare, gym & meds', assigned: 42000 }
+                ]
+              },
+              {
+                id: 'cat_true',
+                name: 'True Expenses & Sinking Funds',
+                tier: 'wants',
+                collapsed: false,
+                envelopes: [
+                  { id: 'env_blacktax', name: 'Black Tax / Family Support', note: 'Parents & siblings allowance', assigned: 85000 },
+                  { id: 'env_detty', name: 'Detty December & Travel Fund', note: 'Flights, concerts & gifts', assigned: 110000 },
+                  { id: 'env_car', name: 'Car Servicing & Comprehensive Ins.', note: 'Quarterly oil change & tires', assigned: 45000 },
+                  { id: 'env_subs', name: 'Subscriptions (Netflix, Apple, iCloud)', note: 'USD card recurring bills', assigned: 20000 }
+                ]
+              },
+              {
+                id: 'cat_savings',
+                name: 'Savings & Wealth Building',
+                tier: 'savings',
+                collapsed: false,
+                envelopes: [
+                  { id: 'env_emergency', name: 'Emergency Fund (PiggyVest / HYSA)', note: '6-month runway goal', assigned: 120000 },
+                  { id: 'env_usd', name: 'Dollar ETFs & Eurobond Mutual Fund', note: 'Long-term FX hedge', assigned: 110000 }
+                ]
+              }
+            ],
+            transactions: [
+              { id: 'tx_1', date: '2026-11-02', payee: 'Ikeja Electric Prepaid Token', envelopeId: 'env_power', type: 'outflow', amount: 55000 },
+              { id: 'tx_2', date: '2026-11-04', payee: 'Shoprite Ikeja City Mall', envelopeId: 'env_groceries', type: 'outflow', amount: 68500 },
+              { id: 'tx_3', date: '2026-11-05', payee: 'FibreOne Broadband Renewal', envelopeId: 'env_internet', type: 'outflow', amount: 24500 },
+              { id: 'tx_4', date: '2026-11-07', payee: 'TotalEnergies Filling Station', envelopeId: 'env_transport', type: 'outflow', amount: 42000 },
+              { id: 'tx_5', date: '2026-11-09', payee: 'Glover Court Suya & Grill', envelopeId: 'env_dining', type: 'outflow', amount: 28500 },
+              { id: 'tx_6', date: '2026-11-10', payee: 'Monthly Transfer to Mum', envelopeId: 'env_blacktax', type: 'outflow', amount: 60000 },
+              { id: 'tx_7', date: '2026-11-12', payee: 'PiggyVest Safelock Auto-Save', envelopeId: 'env_emergency', type: 'outflow', amount: 120000 },
+              { id: 'tx_8', date: '2026-11-14', payee: 'Stanbic IBTC Dollar Fund', envelopeId: 'env_usd', type: 'outflow', amount: 110000 },
+              { id: 'tx_9', date: '2026-11-15', payee: 'Ebeano Supermarket Lekki', envelopeId: 'env_groceries', type: 'outflow', amount: 54000 },
+              { id: 'tx_10', date: '2026-11-17', payee: 'Bolt Rides (Mainland - Island)', envelopeId: 'env_transport', type: 'outflow', amount: 36500 },
+              { id: 'tx_11', date: '2026-11-18', payee: 'Chicken Republic & Smoothie', envelopeId: 'env_dining', type: 'outflow', amount: 31000 },
+              { id: 'tx_12', date: '2026-11-19', payee: 'MedPlus Pharmacy Victoria Island', envelopeId: 'env_health', type: 'outflow', amount: 21500 },
+              { id: 'tx_13', date: '2026-11-20', payee: 'Estate Security & Waste Levy', envelopeId: 'env_estate', type: 'outflow', amount: 25000 }
+            ]
+          }
+        }
+      };
+    }
+
+    let appState = null;
+    let donutChartInstance = null;
+    let barChartInstance = null;
+
+    // Format Nigerian Naira cleanly with commas
+    function formatNaira(amount, showSign = false) {
+      const num = Number(amount) || 0;
+      const absFormatted = Math.abs(num).toLocaleString('en-NG', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      if (num < 0) return `-₦${absFormatted}`;
+      if (showSign && num > 0) return `+₦${absFormatted}`;
+      return `₦${absFormatted}`;
+    }
+
+    // Load state from localStorage or initialize default
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          appState = JSON.parse(raw);
+          if (!appState || !appState.months) {
+            appState = getDefaultDemoData();
+          }
+        } else {
+          appState = getDefaultDemoData();
+        }
+      } catch (err) {
+        console.error('Failed to load state:', err);
+        appState = getDefaultDemoData();
+      }
+      ensureMonthExists(appState.currentMonth);
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (err) {
+        console.error('Failed to save state:', err);
+      }
+    }
+
+    // Clone template structure when switching to an uninitialized month
+    function ensureMonthExists(monthKey) {
+      if (!appState.months[monthKey]) {
+        const templateSource = appState.months['2026-11'] || getDefaultDemoData().months['2026-11'];
+        appState.months[monthKey] = {
+          incomes: JSON.parse(JSON.stringify(templateSource.incomes)),
+          categories: templateSource.categories.map(cat => ({
+            ...cat,
+            envelopes: cat.envelopes.map(env => ({ ...env }))
+          })),
+          transactions: []
+        };
+        saveState();
+      }
+    }
+
+    function getCurrentMonthData() {
+      ensureMonthExists(appState.currentMonth);
+      return appState.months[appState.currentMonth];
+    }
+
+    // Compute net spent (outflows - inflows) for a specific envelope in current month
+    function getEnvelopeActivity(envelopeId) {
+      const data = getCurrentMonthData();
+      return data.transactions
+        .filter(tx => tx.envelopeId === envelopeId)
+        .reduce((sum, tx) => {
+          return tx.type === 'outflow' ? sum + Number(tx.amount) : sum - Number(tx.amount);
+        }, 0);
+    }
+
+    // Compute global totals for current month
+    function getBudgetMetrics() {
+      const data = getCurrentMonthData();
+      const totalIncome = data.incomes.reduce((acc, item) => acc + Number(item.amount || 0), 0);
+      let totalAssigned = 0;
+      let totalSpent = 0;
+
+      data.categories.forEach(cat => {
+        cat.envelopes.forEach(env => {
+          totalAssigned += Number(env.assigned || 0);
+          totalSpent += getEnvelopeActivity(env.id);
+        });
+      });
+
+      const leftToAssign = totalIncome - totalAssigned;
+      const totalAvailable = totalAssigned - totalSpent;
+
+      return {
+        totalIncome,
+        totalAssigned,
+        leftToAssign,
+        totalSpent,
+        totalAvailable
+      };
+    }
+
+    // Toast notification helper
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-forest-900 text-white border-emerald-500',
+        warning: 'bg-amber-600 text-white border-amber-300',
+        error: 'bg-rose-600 text-white border-rose-300'
+      };
+      toast.className = `pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-l-4 shadow-lg text-xs sm:text-sm font-semibold transition-all duration-300 ${colors[type] || colors.success}`;
+      toast.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()" class="opacity-75 hover:opacity-100 cursor-pointer">✕</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // ==================== RENDER FUNCTIONS ====================
+
+    function renderAll() {
+      document.getElementById('month-selector').value = appState.currentMonth;
+      renderKPIBar();
+      renderEnvelopes();
+      populateEnvelopeDropdowns();
+      renderTransactions();
+      if (appState.activeTab === 'insights') {
+        renderInsights();
+      }
+      lucide.createIcons();
+    }
+
+    function renderKPIBar() {
+      const m = getBudgetMetrics();
+      const data = getCurrentMonthData();
+
+      document.getElementById('kpi-total-income').textContent = formatNaira(m.totalIncome);
+      document.getElementById('income-sources-count').textContent = `${data.incomes.length} income stream${data.incomes.length === 1 ? '' : 's'}`;
+
+      document.getElementById('kpi-total-assigned').textContent = formatNaira(m.totalAssigned);
+      const assignedPct = m.totalIncome > 0 ? Math.round((m.totalAssigned / m.totalIncome) * 100) : 0;
+      document.getElementById('kpi-assigned-pct').textContent = `${assignedPct}% of income assigned`;
+
+      document.getElementById('kpi-total-spent').textContent = formatNaira(m.totalSpent);
+      document.getElementById('kpi-total-available').textContent = `${formatNaira(m.totalAvailable)} left in envelopes`;
+
+      const spentPct = m.totalAssigned > 0 ? Math.min(100, Math.round((m.totalSpent / m.totalAssigned) * 100)) : 0;
+      document.getElementById('kpi-spent-pct').textContent = `${spentPct}%`;
+      const spentBar = document.getElementById('kpi-spent-bar');
+      spentBar.style.width = `${spentPct}%`;
+      spentBar.className = `h-full rounded-full transition-all duration-300 ${spentPct > 95 ? 'bg-rose-500' : spentPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`;
+
+      // Zero-Based Hero Card ("Left to Assign")
+      const ltaEl = document.getElementById('kpi-left-to-assign');
+      const cardEl = document.getElementById('left-to-assign-card');
+      const badgeEl = document.getElementById('zero-based-status-badge');
+      const helperEl = document.getElementById('zero-based-helper-text');
+      const actionEl = document.getElementById('zero-based-action-area');
+
+      ltaEl.textContent = formatNaira(m.leftToAssign);
+
+      // Tolerance of 0.01 for floating point
+      if (Math.abs(m.leftToAssign) < 0.01) {
+        ltaEl.textContent = '₦0.00';
+        cardEl.className = 'lg:col-span-5 rounded-2xl p-5 border-2 border-emerald-500 bg-emerald-50/50 transition-all shadow-sm flex flex-col justify-between';
+        ltaEl.className = 'font-tabular text-2xl sm:text-3xl font-extrabold mt-1.5 tracking-tight text-emerald-700';
+        badgeEl.className = 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-emerald-600 text-white shadow-xs';
+        badgeEl.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i><span>Every Naira Has a Job!</span>`;
+        helperEl.textContent = 'Zero-based budget balanced. 100% of your monthly income is purposefully assigned.';
+        actionEl.innerHTML = '';
+      } else if (m.leftToAssign > 0) {
+        cardEl.className = 'lg:col-span-5 rounded-2xl p-5 border-2 border-amber-400 bg-amber-50/40 transition-all shadow-sm flex flex-col justify-between';
+        ltaEl.className = 'font-tabular text-2xl sm:text-3xl font-extrabold mt-1.5 tracking-tight text-amber-700';
+        badgeEl.className = 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-amber-100 text-amber-800 border border-amber-300';
+        badgeEl.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4"></i><span>Unassigned Naira</span>`;
+        helperEl.textContent = `You still have ${formatNaira(m.leftToAssign)} waiting for an envelope job.`;
+        actionEl.innerHTML = `
+          <button onclick="autoAssignRemaining()" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs cursor-pointer">
+            Auto-Assign to Savings
+          </button>
+        `;
+      } else {
+        cardEl.className = 'lg:col-span-5 rounded-2xl p-5 border-2 border-rose-500 bg-rose-50/50 transition-all shadow-sm flex flex-col justify-between';
+        ltaEl.className = 'font-tabular text-2xl sm:text-3xl font-extrabold mt-1.5 tracking-tight text-rose-700';
+        badgeEl.className = 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-rose-600 text-white shadow-xs';
+        badgeEl.innerHTML = `<i data-lucide="octagon-alert" class="w-4 h-4"></i><span>Over-Assigned!</span>`;
+        helperEl.textContent = `You assigned ${formatNaira(Math.abs(m.leftToAssign))} more than your income. Trim an envelope.`;
+        actionEl.innerHTML = `
+          <button onclick="openMoveMoneyModal()" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs cursor-pointer">
+            Rebalance Envelopes
+          </button>
+        `;
+      }
+
+      // Update transaction badge count
+      document.getElementById('tx-count-badge').textContent = data.transactions.length;
+    }
+
+    function renderEnvelopes() {
+      const data = getCurrentMonthData();
+      const container = document.getElementById('categories-container');
+      const query = (document.getElementById('envelope-search')?.value || '').trim().toLowerCase();
+
+      container.innerHTML = '';
+
+      data.categories.forEach(cat => {
+        const filteredEnvelopes = cat.envelopes.filter(env =>
+          env.name.toLowerCase().includes(query) ||
+          (env.note && env.note.toLowerCase().includes(query)) ||
+          cat.name.toLowerCase().includes(query)
+        );
+
+        if (query && filteredEnvelopes.length === 0) return;
+
+        // Calculate category subtotals
+        let catAssigned = 0;
+        let catSpent = 0;
+        cat.envelopes.forEach(env => {
+          catAssigned += Number(env.assigned || 0);
+          catSpent += getEnvelopeActivity(env.id);
+        });
+        const catAvailable = catAssigned - catSpent;
+
+        const tierBadge = cat.tier === 'savings'
+          ? '<span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-teal-50 text-teal-700 border border-teal-200">Savings</span>'
+          : cat.tier === 'wants'
+          ? '<span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-amber-50 text-amber-700 border border-amber-200">Lifestyle</span>'
+          : '<span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">Needs</span>';
+
+        const catCard = document.createElement('div');
+        catCard.className = 'bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden';
+
+        catCard.innerHTML = `
+          <!-- Category Header -->
+          <div class="px-4 sm:px-6 py-3.5 bg-slate-50/90 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <button onclick="toggleCategoryCollapse('${cat.id}')" class="p-1 rounded-lg hover:bg-slate-200/70 text-slate-600 transition cursor-pointer">
+                <i data-lucide="${cat.collapsed ? 'chevron-right' : 'chevron-down'}" class="w-4 h-4"></i>
+              </button>
+              <h3 class="font-bold text-sm sm:text-base text-slate-900">${cat.name}</h3>
+              ${tierBadge}
+              <button onclick="openEnvelopeModal('${cat.id}')" title="Add Envelope to ${cat.name}" class="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-4 sm:gap-6 text-xs font-tabular">
+              <div class="hidden sm:block text-right">
+                <span class="text-slate-400 block text-[10px] font-sans uppercase font-bold">Assigned</span>
+                <span class="font-bold text-slate-700">${formatNaira(catAssigned)}</span>
+              </div>
+              <div class="hidden sm:block text-right">
+                <span class="text-slate-400 block text-[10px] font-sans uppercase font-bold">Spent</span>
+                <span class="font-bold text-slate-700">${formatNaira(catSpent)}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-slate-400 block text-[10px] font-sans uppercase font-bold">Available</span>
+                <span class="font-extrabold ${catAvailable < 0 ? 'text-rose-600' : 'text-emerald-700'}">${formatNaira(catAvailable)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Envelopes List -->
+          <div class="${cat.collapsed ? 'hidden' : 'divide-y divide-slate-100'}">
+            ${filteredEnvelopes.map(env => renderEnvelopeRowHTML(cat.id, env)).join('')}
+          </div>
+        `;
+
+        container.appendChild(catCard);
+      });
+    }
+
+    function renderEnvelopeRowHTML(catId, env) {
+      const assigned = Number(env.assigned || 0);
+      const spent = getEnvelopeActivity(env.id);
+      const available = assigned - spent;
+
+      // Determine pill color & progress bar
+      let pillClass = 'bg-slate-100 text-slate-600';
+      let barClass = 'bg-emerald-500';
+      if (available < 0) {
+        pillClass = 'bg-rose-100 text-rose-700 border border-rose-300 font-extrabold';
+        barClass = 'bg-rose-500';
+      } else if (assigned > 0 && available / assigned < 0.2) {
+        pillClass = 'bg-amber-100 text-amber-800 border border-amber-300';
+        barClass = 'bg-amber-500';
+      } else if (available > 0) {
+        pillClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+        barClass = 'bg-emerald-500';
+      }
+
+      const pct = assigned > 0 ? Math.min(100, Math.max(0, (spent / assigned) * 100)) : (spent > 0 ? 100 : 0);
+
+      return `
+        <div class="px-4 sm:px-6 py-3.5 hover:bg-slate-50/80 transition grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center group">
+          <!-- Column 1: Envelope Name, Note & Progress Bar -->
+          <div class="md:col-span-5 flex flex-col gap-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="font-semibold text-sm text-slate-900 truncate">${env.name}</span>
+                <button onclick="openEditEnvelopeModal('${catId}', '${env.id}')" title="Edit Envelope" class="opacity-70 md:opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-slate-200 text-slate-500 transition cursor-pointer">
+                  <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <!-- Mobile Available Pill -->
+              <span class="md:hidden font-tabular text-xs font-bold px-2.5 py-1 rounded-full ${pillClass}">
+                ${formatNaira(available)}
+              </span>
+            </div>
+            ${env.note ? `<p class="text-xs text-slate-500 truncate">${env.note}</p>` : ''}
+            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-0.5">
+              <div class="h-full ${barClass} rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+            </div>
+          </div>
+
+          <!-- Column 2: Assigned Inline Input & Quick Stepper Buttons -->
+          <div class="md:col-span-3 flex items-center justify-between md:justify-end gap-1.5">
+            <span class="md:hidden text-xs font-semibold text-slate-500">Assigned:</span>
+            <div class="flex items-center bg-slate-50 border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-xl px-2 py-1">
+              <button type="button" onclick="adjustAssigned('${env.id}', -5000)" title="Decrease by ₦5,000" class="w-6 h-6 rounded-lg hover:bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center cursor-pointer">−</button>
+              <span class="text-xs font-tabular text-slate-400 pl-1">₦</span>
+              <input
+                type="number"
+                step="100"
+                min="0"
+                value="${assigned}"
+                onchange="updateAssignedDirect('${env.id}', this.value)"
+                class="w-24 sm:w-28 text-right font-tabular text-sm font-bold text-slate-900 bg-transparent focus:outline-none px-1"
+              />
+              <button type="button" onclick="adjustAssigned('${env.id}', 5000)" title="Increase by ₦5,000" class="w-6 h-6 rounded-lg hover:bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center cursor-pointer">+</button>
+            </div>
+          </div>
+
+          <!-- Column 3: Activity / Spent -->
+          <div class="md:col-span-2 flex items-center justify-between md:justify-end">
+            <span class="md:hidden text-xs font-semibold text-slate-500">Spent:</span>
+            <span class="font-tabular text-sm font-medium ${spent > 0 ? 'text-slate-700' : 'text-slate-400'}">
+              ${spent > 0 ? `-${formatNaira(spent)}` : '₦0.00'}
+            </span>
+          </div>
+
+          <!-- Column 4: Available Balance Pill (Desktop) -->
+          <div class="hidden md:flex md:col-span-2 items-center justify-end gap-1.5">
+            ${available < 0 ? `
+              <button onclick="openMoveMoneyModal('${env.id}')" title="Cover overspending from another envelope" class="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold uppercase tracking-wide cursor-pointer">
+                Cover
+              </button>
+            ` : ''}
+            <span class="font-tabular text-xs font-bold px-3 py-1.5 rounded-full ${pillClass}">
+              ${formatNaira(available)}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==================== ENVELOPE ACTIONS ====================
+
+    function updateAssignedDirect(envelopeId, newValue) {
+      const val = Math.max(0, parseFloat(newValue) || 0);
+      const data = getCurrentMonthData();
+      for (const cat of data.categories) {
+        const env = cat.envelopes.find(e => e.id === envelopeId);
+        if (env) {
+          env.assigned = val;
+          break;
+        }
+      }
+      saveState();
+      renderAll();
+    }
+
+    function adjustAssigned(envelopeId, delta) {
+      const data = getCurrentMonthData();
+      for (const cat of data.categories) {
+        const env = cat.envelopes.find(e => e.id === envelopeId);
+        if (env) {
+          env.assigned = Math.max(0, Number(env.assigned || 0) + delta);
+          break;
+        }
+      }
+      saveState();
+      renderAll();
+    }
+
+    function autoAssignRemaining() {
+      const m = getBudgetMetrics();
+      if (m.leftToAssign <= 0) return;
+
+      const data = getCurrentMonthData();
+      // Find first savings envelope, or fallback to first available envelope
+      let targetEnv = null;
+      for (const cat of data.categories) {
+        if (cat.tier === 'savings' && cat.envelopes.length > 0) {
+          targetEnv = cat.envelopes[0];
+          break;
+        }
+      }
+      if (!targetEnv && data.categories[0]?.envelopes[0]) {
+        targetEnv = data.categories[0].envelopes[0];
+      }
+
+      if (targetEnv) {
+        targetEnv.assigned = Number(targetEnv.assigned || 0) + m.leftToAssign;
+        saveState();
+        renderAll();
+        showToast(`Assigned ${formatNaira(m.leftToAssign)} to "${targetEnv.name}"! Every Naira now has a job.`);
+      }
+    }
+
+    function toggleCategoryCollapse(catId) {
+      const data = getCurrentMonthData();
+      const cat = data.categories.find(c => c.id === catId);
+      if (cat) {
+        cat.collapsed = !cat.collapsed;
+        saveState();
+        renderEnvelopes();
+        lucide.createIcons();
+      }
+    }
+
+    function toggleAllCategories() {
+      const data = getCurrentMonthData();
+      appState.allCollapsed = !appState.allCollapsed;
+      data.categories.forEach(c => c.collapsed = appState.allCollapsed);
+      document.getElementById('toggle-all-btn').textContent = appState.allCollapsed ? 'Expand All' : 'Collapse All';
+      saveState();
+      renderEnvelopes();
+      lucide.createIcons();
+    }
+
+    // ==================== TRANSACTIONS LOGIC ====================
+
+    function populateEnvelopeDropdowns() {
+      const data = getCurrentMonthData();
+      const optionsHTML = data.categories.map(cat => `
+        <optgroup label="${cat.name}">
+          ${cat.envelopes.map(env => {
+            const avail = Number(env.assigned || 0) - getEnvelopeActivity(env.id);
+            return `<option value="${env.id}">${env.name} (${formatNaira(avail)} left)</option>`;
+          }).join('')}
+        </optgroup>
+      `).join('');
+
+      ['qtx-envelope', 'mtx-envelope'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = optionsHTML;
+      });
+
+      const filterEl = document.getElementById('tx-filter-envelope');
+      if (filterEl) {
+        const currentVal = filterEl.value;
+        filterEl.innerHTML = `<option value="all">All Envelopes</option>` + optionsHTML;
+        filterEl.value = currentVal || 'all';
+      }
+    }
+
+    function getEnvelopeNameById(envId) {
+      const data = getCurrentMonthData();
+      for (const cat of data.categories) {
+        const env = cat.envelopes.find(e => e.id === envId);
+        if (env) return { name: env.name, category: cat.name };
+      }
+      return { name: 'Uncategorized', category: '' };
+    }
+
+    function addTransaction(date, payee, envelopeId, type, amount) {
+      const data = getCurrentMonthData();
+      data.transactions.unshift({
+        id: 'tx_' + Date.now(),
+        date,
+        payee: payee.trim(),
+        envelopeId,
+        type,
+        amount: parseFloat(amount)
+      });
+      saveState();
+      renderAll();
+      showToast(`${type === 'outflow' ? 'Expense' : 'Inflow'} of ${formatNaira(amount)} logged!`);
+    }
+
+    function handleQuickTransactionSubmit(e) {
+      e.preventDefault();
+      const date = document.getElementById('qtx-date').value;
+      const payee = document.getElementById('qtx-payee').value;
+      const envelopeId = document.getElementById('qtx-envelope').value;
+      const type = document.getElementById('qtx-type').value;
+      const amount = document.getElementById('qtx-amount').value;
+
+      addTransaction(date, payee, envelopeId, type, amount);
+      document.getElementById('qtx-payee').value = '';
+      document.getElementById('qtx-amount').value = '';
+    }
+
+    function handleModalTransactionSubmit(e) {
+      e.preventDefault();
+      const date = document.getElementById('mtx-date').value;
+      const payee = document.getElementById('mtx-payee').value;
+      const envelopeId = document.getElementById('mtx-envelope').value;
+      const type = document.getElementById('mtx-type').value;
+      const amount = document.getElementById('mtx-amount').value;
+
+      addTransaction(date, payee, envelopeId, type, amount);
+      closeModal('transaction-modal');
+      e.target.reset();
+      setDefaultDates();
+    }
+
+    function deleteTransaction(txId) {
+      const data = getCurrentMonthData();
+      data.transactions = data.transactions.filter(t => t.id !== txId);
+      saveState();
+      renderAll();
+      showToast('Transaction removed and envelope balance restored.', 'warning');
+    }
+
+    function renderTransactions() {
+      const data = getCurrentMonthData();
+      const tbody = document.getElementById('transactions-tbody');
+      const search = (document.getElementById('tx-search')?.value || '').trim().toLowerCase();
+      const envFilter = document.getElementById('tx-filter-envelope')?.value || 'all';
+      const typeFilter = document.getElementById('tx-filter-type')?.value || 'all';
+
+      const filtered = data.transactions
+        .filter(tx => {
+          const envInfo = getEnvelopeNameById(tx.envelopeId);
+          const matchesSearch = !search || tx.payee.toLowerCase().includes(search) || envInfo.name.toLowerCase().includes(search);
+          const matchesEnv = envFilter === 'all' || tx.envelopeId === envFilter;
+          const matchesType = typeFilter === 'all' || tx.type === typeFilter;
+          return matchesSearch && matchesEnv && matchesType;
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      document.getElementById('tx-filtered-summary').textContent = `Showing ${filtered.length} transaction${filtered.length === 1 ? '' : 's'}`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-10 text-center text-slate-400 text-sm">
+              No matching transactions found for this filter.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(tx => {
+        const envInfo = getEnvelopeNameById(tx.envelopeId);
+        const isOutflow = tx.type === 'outflow';
+        return `
+          <tr class="hover:bg-slate-50/90 transition">
+            <td class="py-3 px-4 font-tabular text-xs text-slate-500 whitespace-nowrap">${tx.date}</td>
+            <td class="py-3 px-4 font-semibold text-slate-900">${tx.payee}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">
+                ${envInfo.name}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-right font-tabular font-bold whitespace-nowrap ${isOutflow ? 'text-slate-900' : 'text-emerald-600'}">
+              ${isOutflow ? `-${formatNaira(tx.amount)}` : `+${formatNaira(tx.amount)}`}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <button onclick="deleteTransaction('${tx.id}')" title="Delete Transaction" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==================== MODALS: INCOME, MOVE MONEY, ENVELOPES, CATEGORIES ====================
+
+    function openModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    }
+
+    // Income Modal
+    function openIncomeModal() {
+      renderIncomeList();
+      openModal('income-modal');
+    }
+
+    function renderIncomeList() {
+      const data = getCurrentMonthData();
+      const list = document.getElementById('income-list');
+      const total = data.incomes.reduce((s, i) => s + Number(i.amount || 0), 0);
+
+      document.getElementById('modal-total-income').textContent = formatNaira(total);
+
+      if (data.incomes.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">No income sources added yet.</p>`;
+        return;
+      }
+
+      list.innerHTML = data.incomes.map(inc => `
+        <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-sm text-slate-900 truncate">${inc.name}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              step="100"
+              min="0"
+              value="${inc.amount}"
+              onchange="updateIncomeAmount('${inc.id}', this.value)"
+              class="w-32 text-right font-tabular text-sm font-bold text-emerald-700 bg-white border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500"
+            />
+            <button onclick="deleteIncomeSource('${inc.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function addIncomeSource(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-income-name').value.trim();
+      const amount = parseFloat(document.getElementById('new-income-amount').value);
+      if (!name || isNaN(amount) || amount <= 0) return;
+
+      const data = getCurrentMonthData();
+      data.incomes.push({
+        id: 'inc_' + Date.now(),
+        name,
+        amount
+      });
+      document.getElementById('new-income-name').value = '';
+      document.getElementById('new-income-amount').value = '';
+      saveState();
+      renderIncomeList();
+      renderAll();
+      showToast(`Added income stream: ${name}`);
+    }
+
+    function updateIncomeAmount(incId, newVal) {
+      const data = getCurrentMonthData();
+      const inc = data.incomes.find(i => i.id === incId);
+      if (inc) {
+        inc.amount = Math.max(0, parseFloat(newVal) || 0);
+        saveState();
+        renderIncomeList();
+        renderAll();
+      }
+    }
+
+    function deleteIncomeSource(incId) {
+      const data = getCurrentMonthData();
+      data.incomes = data.incomes.filter(i => i.id !== incId);
+      saveState();
+      renderIncomeList();
+      renderAll();
+      showToast('Income source removed.', 'warning');
+    }
+
+    // Transaction Modal
+    function openTransactionModal() {
+      populateEnvelopeDropdowns();
+      setDefaultDates();
+      openModal('transaction-modal');
+    }
+
+    // Move Money Modal
+    function openMoveMoneyModal(preselectToEnvId = null) {
+      const data = getCurrentMonthData();
+      const m = getBudgetMetrics();
+
+      const fromOptions = [
+        `<option value="__left_to_assign__">Left to Assign (${formatNaira(Math.max(0, m.leftToAssign))} available)</option>`,
+        ...data.categories.map(cat => `
+          <optgroup label="${cat.name}">
+            ${cat.envelopes.map(env => {
+              const avail = Number(env.assigned || 0) - getEnvelopeActivity(env.id);
+              return `<option value="${env.id}">${env.name} (${formatNaira(avail)} available)</option>`;
+            }).join('')}
+          </optgroup>
+        `)
+      ].join('');
+
+      const toOptions = data.categories.map(cat => `
+        <optgroup label="${cat.name}">
+          ${cat.envelopes.map(env => {
+            const avail = Number(env.assigned || 0) - getEnvelopeActivity(env.id);
+            return `<option value="${env.id}">${env.name} (${formatNaira(avail)} available)</option>`;
+          }).join('')}
+        </optgroup>
+      `).join('');
+
+      document.getElementById('move-from').innerHTML = fromOptions;
+      document.getElementById('move-to').innerHTML = toOptions;
+
+      if (preselectToEnvId) {
+        document.getElementById('move-to').value = preselectToEnvId;
+        // Pre-fill deficit amount if overspent
+        for (const cat of data.categories) {
+          const env = cat.envelopes.find(e => e.id === preselectToEnvId);
+          if (env) {
+            const avail = Number(env.assigned || 0) - getEnvelopeActivity(env.id);
+            if (avail < 0) {
+              document.getElementById('move-amount').value = Math.abs(avail);
+            }
+          }
+        }
+      }
+
+      openModal('move-money-modal');
+    }
+
+    function handleMoveMoneySubmit(e) {
+      e.preventDefault();
+      const fromId = document.getElementById('move-from').value;
+      const toId = document.getElementById('move-to').value;
+      const amount = parseFloat(document.getElementById('move-amount').value);
+
+      if (fromId === toId || isNaN(amount) || amount <= 0) {
+        showToast('Please select two distinct envelopes and a valid amount.', 'error');
+        return;
+      }
+
+      const data = getCurrentMonthData();
+
+      if (fromId !== '__left_to_assign__') {
+        for (const cat of data.categories) {
+          const fromEnv = cat.envelopes.find(env => env.id === fromId);
+          if (fromEnv) {
+            fromEnv.assigned = Math.max(0, Number(fromEnv.assigned || 0) - amount);
+            break;
+          }
+        }
+      }
+
+      for (const cat of data.categories) {
+        const toEnv = cat.envelopes.find(env => env.id === toId);
+        if (toEnv) {
+          toEnv.assigned = Number(toEnv.assigned || 0) + amount;
+          break;
+        }
+      }
+
+      saveState();
+      renderAll();
+      closeModal('move-money-modal');
+      e.target.reset();
+      showToast(`Moved ${formatNaira(amount)} successfully!`);
+    }
+
+    // Create / Edit Envelope Modal
+    function openEnvelopeModal(preselectCatId = null) {
+      const data = getCurrentMonthData();
+      document.getElementById('env-modal-title').textContent = 'Create New Envelope';
+      document.getElementById('env-edit-id').value = '';
+      document.getElementById('env-name-input').value = '';
+      document.getElementById('env-note-input').value = '';
+      document.getElementById('env-assigned-input').value = '0';
+      document.getElementById('env-delete-btn').classList.add('hidden');
+
+      const catSelect = document.getElementById('env-category-select');
+      catSelect.innerHTML = data.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      if (preselectCatId) catSelect.value = preselectCatId;
+
+      openModal('envelope-modal');
+    }
+
+    function openEditEnvelopeModal(catId, envId) {
+      const data = getCurrentMonthData();
+      const cat = data.categories.find(c => c.id === catId);
+      const env = cat?.envelopes.find(e => e.id === envId);
+      if (!env) return;
+
+      document.getElementById('env-modal-title').textContent = 'Edit Envelope';
+      document.getElementById('env-edit-id').value = env.id;
+      document.getElementById('env-name-input').value = env.name;
+      document.getElementById('env-note-input').value = env.note || '';
+      document.getElementById('env-assigned-input').value = env.assigned || 0;
+      document.getElementById('env-delete-btn').classList.remove('hidden');
+
+      const catSelect = document.getElementById('env-category-select');
+      catSelect.innerHTML = data.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      catSelect.value = catId;
+
+      openModal('envelope-modal');
+    }
+
+    function handleEnvelopeSubmit(e) {
+      e.preventDefault();
+      const editId = document.getElementById('env-edit-id').value;
+      const targetCatId = document.getElementById('env-category-select').value;
+      const name = document.getElementById('env-name-input').value.trim();
+      const note = document.getElementById('env-note-input').value.trim();
+      const assigned = Math.max(0, parseFloat(document.getElementById('env-assigned-input').value) || 0);
+
+      const data = getCurrentMonthData();
+
+      if (editId) {
+        // Remove from old category if moved, then update
+        let existingEnv = null;
+        data.categories.forEach(c => {
+          const idx = c.envelopes.findIndex(env => env.id === editId);
+          if (idx !== -1) {
+            existingEnv = c.envelopes[idx];
+            if (c.id !== targetCatId) {
+              c.envelopes.splice(idx, 1);
+            }
+          }
+        });
+
+        if (existingEnv) {
+          existingEnv.name = name;
+          existingEnv.note = note;
+          existingEnv.assigned = assigned;
+          const destCat = data.categories.find(c => c.id === targetCatId);
+          if (destCat && !destCat.envelopes.find(env => env.id === editId)) {
+            destCat.envelopes.push(existingEnv);
+          }
+        }
+        showToast(`Updated envelope "${name}"`);
+      } else {
+        const destCat = data.categories.find(c => c.id === targetCatId);
+        if (destCat) {
+          destCat.envelopes.push({
+            id: 'env_' + Date.now(),
+            name,
+            note,
+            assigned
+          });
+          showToast(`Created envelope "${name}"`);
+        }
+      }
+
+      saveState();
+      renderAll();
+      closeModal('envelope-modal');
+    }
+
+    function deleteCurrentEnvelope() {
+      const editId = document.getElementById('env-edit-id').value;
+      if (!editId) return;
+      const data = getCurrentMonthData();
+      data.categories.forEach(c => {
+        c.envelopes = c.envelopes.filter(e => e.id !== editId);
+      });
+      saveState();
+      renderAll();
+      closeModal('envelope-modal');
+      showToast('Envelope deleted.', 'warning');
+    }
+
+    // Create Category Group Modal
+    function openCategoryModal() {
+      document.getElementById('cat-name-input').value = '';
+      openModal('category-modal');
+    }
+
+    function handleCategorySubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('cat-name-input').value.trim();
+      const tier = document.getElementById('cat-tier-input').value;
+      if (!name) return;
+
+      const data = getCurrentMonthData();
+      data.categories.push({
+        id: 'cat_' + Date.now(),
+        name,
+        tier,
+        collapsed: false,
+        envelopes: []
+      });
+
+      saveState();
+      renderAll();
+      closeModal('category-modal');
+      showToast(`Created category group "${name}"`);
+    }
+
+    // Reset Demo Data Modal
+    function openResetConfirmModal() {
+      openModal('reset-modal');
+    }
+
+    function confirmResetDemoData() {
+      appState = getDefaultDemoData();
+      saveState();
+      renderAll();
+      closeModal('reset-modal');
+      showToast('Restored realistic Nigerian Naira (₦) demo data!');
+    }
+
+    // ==================== NAVIGATION & MONTH SWITCHING ====================
+
+    function switchTab(tabName) {
+      appState.activeTab = tabName;
+      saveState();
+
+      ['envelopes', 'transactions', 'insights'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const navBtn = document.getElementById(`nav-${t}`);
+        const mobBtn = document.getElementById(`mob-nav-${t}`);
+
+        if (t === tabName) {
+          view.classList.remove('hidden');
+          if (navBtn) {
+            navBtn.className = 'tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-emerald-500 text-forest-950 shadow-sm cursor-pointer';
+          }
+          if (mobBtn) {
+            mobBtn.className = 'mob-tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500 text-forest-950 cursor-pointer';
+          }
+        } else {
+          view.classList.add('hidden');
+          if (navBtn) {
+            navBtn.className = 'tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all text-emerald-100 hover:text-white hover:bg-white/5 cursor-pointer';
+          }
+          if (mobBtn) {
+            mobBtn.className = 'mob-tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-100 bg-forest-950/50 cursor-pointer';
+          }
+        }
+      });
+
+      if (tabName === 'insights') {
+        renderInsights();
+      }
+      lucide.createIcons();
+    }
+
+    function changeMonth(monthKey) {
+      appState.currentMonth = monthKey;
+      ensureMonthExists(monthKey);
+      saveState();
+      setDefaultDates();
+      renderAll();
+      showToast(`Switched budget period to ${document.getElementById('month-selector').selectedOptions[0].text}`);
+    }
+
+    function setDefaultDates() {
+      const todayStr = `${appState.currentMonth}-20`;
+      const qtxDate = document.getElementById('qtx-date');
+      const mtxDate = document.getElementById('mtx-date');
+      if (qtxDate) qtxDate.value = todayStr;
+      if (mtxDate) mtxDate.value = todayStr;
+    }
+
+    // ==================== INSIGHTS & CHARTS ====================
+
+    function renderInsights() {
+      const data = getCurrentMonthData();
+      let needsTotal = 0;
+      let wantsTotal = 0;
+      let savingsTotal = 0;
+
+      const groupLabels = [];
+      const groupAssigned = [];
+      const groupSpent = [];
+
+      data.categories.forEach(cat => {
+        let cAssigned = 0;
+        let cSpent = 0;
+        cat.envelopes.forEach(env => {
+          const a = Number(env.assigned || 0);
+          const s = getEnvelopeActivity(env.id);
+          cAssigned += a;
+          cSpent += s;
+        });
+
+        groupLabels.push(cat.name);
+        groupAssigned.push(cAssigned);
+        groupSpent.push(cSpent);
+
+        if (cat.tier === 'savings') savingsTotal += cAssigned;
+        else if (cat.tier === 'wants') wantsTotal += cAssigned;
+        else needsTotal += cAssigned;
+      });
+
+      const grandAssigned = needsTotal + wantsTotal + savingsTotal;
+
+      const needsPct = grandAssigned > 0 ? Math.round((needsTotal / grandAssigned) * 100) : 0;
+      const wantsPct = grandAssigned > 0 ? Math.round((wantsTotal / grandAssigned) * 100) : 0;
+      const savingsPct = grandAssigned > 0 ? Math.round((savingsTotal / grandAssigned) * 100) : 0;
+
+      document.getElementById('insight-needs-amt').textContent = formatNaira(needsTotal);
+      document.getElementById('insight-needs-pct').textContent = `${needsPct}% of Assigned`;
+      document.getElementById('insight-needs-bar').style.width = `${needsPct}%`;
+
+      document.getElementById('insight-wants-amt').textContent = formatNaira(wantsTotal);
+      document.getElementById('insight-wants-pct').textContent = `${wantsPct}% of Assigned`;
+      document.getElementById('insight-wants-bar').style.width = `${wantsPct}%`;
+
+      document.getElementById('insight-savings-amt').textContent = formatNaira(savingsTotal);
+      document.getElementById('insight-savings-pct').textContent = `${savingsPct}% of Assigned`;
+      document.getElementById('insight-savings-bar').style.width = `${savingsPct}%`;
+
+      // Render Donut Chart
+      const donutCtx = document.getElementById('allocationDonutChart').getContext('2d');
+      if (donutChartInstance) donutChartInstance.destroy();
+      donutChartInstance = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: groupLabels,
+          datasets: [{
+            data: groupAssigned,
+            backgroundColor: ['#064E3B', '#10B981', '#F59E0B', '#0D9488', '#6366F1', '#EC4899'],
+            borderWidth: 2,
+            borderColor: '#FFFFFF'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '66%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                boxWidth: 12,
+                padding: 14,
+                font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.label}: ${formatNaira(ctx.raw)}`
+              }
+            }
+          }
+        }
+      });
+
+      // Render Grouped Bar Chart
+      const barCtx = document.getElementById('assignedVsSpentChart').getContext('2d');
+      if (barChartInstance) barChartInstance.destroy();
+      barChartInstance = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: groupLabels,
+          datasets: [
+            {
+              label: 'Assigned (₦)',
+              data: groupAssigned,
+              backgroundColor: '#10B981',
+              borderRadius: 6
+            },
+            {
+              label: 'Actual Spent (₦)',
+              data: groupSpent,
+              backgroundColor: '#064E3B',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: (val) => '₦' + (val / 1000) + 'k',
+                font: { family: 'JetBrains Mono', size: 11 }
+              },
+              grid: { color: '#F1F5F9' }
+            },
+            x: {
+              ticks: {
+                font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' }
+              },
+              grid: { display: false }
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                boxWidth: 12,
+                font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${formatNaira(ctx.raw)}`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ==================== INITIALIZATION ====================
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      setDefaultDates();
+      switchTab(appState.activeTab || 'envelopes');
+      renderAll();
+    });
+  </script>
+</body>
+</html>
